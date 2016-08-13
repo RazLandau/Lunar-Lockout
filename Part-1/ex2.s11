@@ -1,0 +1,274 @@
+. = torg + 1000
+
+main:
+
+mov #Moves, r0
+mov #Board, r2
+
+; r5 points to final square:		
+mov #Finish, r5
+movb (r5)+, row
+movb (r5), col
+mov row, r5
+mul nCols, r5
+add col, r5
+add r2, r5
+
+movb #0, Score
+
+read_move: 	
+		
+		; initialize row
+		movb(r0)+, row ; row
+		
+		; check if reached end of moves:
+		cmpb row, #'@ 
+		bne next_move ; not reached end of moves
+		jmp end_of_moves ; reached end of moves
+		
+		; Not reached end of moves
+		next_move:
+		
+		; check valid row:
+		cmpb row, #0
+		blt bad_row ; row<0
+		cmpb row, nRows
+		bge bad_row ; row>=nRows
+		jmp row_valid ; row is valid
+		bad_row: jmp out_of_bounds ; bad row
+		
+		; Row is valid
+		row_valid:
+		
+		; check valid col:
+		movb(r0)+, col ; col
+		cmpb col, 0
+		blt bad_col ; col<0	
+		cmpb col, nCols
+		bge bad_col ; col>=nCols
+		jmp col_valid ; col is valid
+		bad_col: jmp out_of_bounds ; bad col
+		
+		; Col is valid
+		col_valid:
+		
+		; r1 points to chosen square:
+		mov row, r1
+		mul nCols, r1
+		add col, r1
+		add r2, r1
+		
+		; check valid square:
+		cmpb (r1), #'B
+		beq square_not_valid ; chosen square is block
+		cmpb (r1), #0
+		beq square_not_valid ; chosen square is empty
+		jmp square_valid
+		square_not_valid: jmp bad_square
+		
+		; Square is valid
+		square_valid:
+		
+		; read direction
+		movb(r0)+, direction ; direction
+		cmpb  direction, #'L
+		beq left ; direction left
+		cmpb  direction, #'R
+		beq right ; direction right
+		cmpb  direction, #'U
+		beq up ; direction up
+		cmpb  direction, #'D
+		beq down ; direction down
+		jmp bad_direction
+		
+		end_of_moves:
+		cmpb (r5), #'A
+		;cmpb @pointer, #'A
+		bne bad_moves
+		;cmp pointer, r5
+		;bne bad_moves
+		jmp success
+		
+		bad_moves: jmp game_over
+
+left: 	
+		; pointer point to adress of chosen_square:
+		mov r1, pointer
+		
+		; r3 points to end of previous row:
+		mov row, r3
+		mul nCols, r3
+		dec r3
+		add #Board, r3 
+		
+		check_left_row:		
+		; advances pointer:
+		dec pointer
+						
+		; check if pointer reached end of row
+		cmp pointer, r3 
+		beq left_end ; reached end of row
+		jmp next_left_check
+		left_end: jmp bad_direction
+						
+		; Check if an obstacle exists to the left
+		next_left_check:
+		cmpb @pointer, #'R ; robot exists
+		beq move_left
+		cmpb @pointer, #'B ; block exists
+		beq move_left
+		cmpb @pointer, #'A ; astronaut exists
+		beq move_left
+		br check_left_row ; square is empty
+		
+		; An obstacle exists
+		move_left:
+		inc pointer ; pointer points where chosen square should be
+		br swap	
+				
+up: 	
+		; pointer point to adress of chosen_square:
+		mov r1, pointer
+		
+		; r3 points to the square above the column
+		add #Board, r3 
+		sub nCols, r3
+		add col, r3
+		
+		check_up_col:		
+		; advances pointer:
+		sub nCols, pointer;
+						
+		; check if pointer reached end of col
+		cmp pointer, r3 
+		beq up_end ; reached end of col
+		jmp next_up_check
+		up_end: jmp bad_direction
+						
+		; Check if an obstacle exists to the left
+		next_up_check:
+		cmpb @pointer, #'R ; robot exists
+		beq move_up
+		cmpb @pointer, #'B ; block exists
+		beq move_up
+		cmpb @pointer, #'A ; astronaut exists
+		beq move_up
+		br check_up_col ; square is empty
+		
+		; An obstacle exists
+		move_up:
+		add nCols, pointer ; pointer points where chosen square should be
+		br swap	
+					
+right: 	
+		; pointer point to adress of chosen_square:
+		mov r1, pointer
+		
+		; r3 points to start of next row:
+		mov row, r3
+		inc r3
+		mul nCols, r3
+		add #Board, r3  ; r3 points to start of next row
+		
+		check_right_row:		
+		; advances pointer:
+		inc pointer
+						
+		; check if pointer reached end of row
+		cmp pointer, r3 
+		beq right_end ; reached end of row
+		jmp next_right_check
+		right_end: jmp bad_direction
+						
+		; Check if an obstacle exists to the left
+		next_right_check:
+		cmpb @pointer, #'R ; robot exists
+		beq move_right
+		cmpb @pointer, #'B ; block exists
+		beq move_right
+		cmpb @pointer, #'A ; astronaut exists
+		beq move_right
+		br check_right_row ; square is empty
+		
+		; An obstacle exists
+		move_right:
+		dec pointer ; pointer points where chosen square should be
+		br swap	
+
+down: 	
+		; pointer point to adress of chosen_square:
+		mov r1, pointer
+		
+		; r3 points to the square below the column
+		add nRows, r3 
+		mul nCols, r3
+		add col, r3
+		add #Board, r3
+		
+		check_down_col:		
+		; advances pointer:
+		add nCols, pointer;
+						
+		; check if pointer reached end of col
+		cmp pointer, r3 
+		beq down_end ; reached end of col
+		jmp next_down_check
+		down_end: jmp bad_direction
+						
+		; Check if an obstacle exists to the left
+		next_down_check:
+		cmpb @pointer, #'R ; robot exists
+		beq move_down
+		cmpb @pointer, #'B ; block exists
+		beq move_down
+		cmpb @pointer, #'A ; astronaut exists
+		beq move_down
+		br check_down_col ; square is empty
+		
+		; An obstacle exists
+		move_down:
+		sub nCols, pointer ; pointer points where chosen square should be
+		br swap				
+				
+swap:			
+				; Swap:
+				movb (r1), temp
+				movb @pointer, (r1)
+				movb temp, @pointer
+				; Move ended:
+				inc Score ; increase succesfull moves count
+				jmp read_move ; read next move
+		
+out_of_bounds:	movb #'F, Output
+					mov #0, Score
+					jmp end
+				
+bad_square:		movb #'F, Output
+					mov #1, Score
+					jmp end
+				
+bad_direction:	movb #'F, Output
+					mov #2, Score
+					jmp end				
+
+game_over:			movb #'F, Output
+					mov #3, Score
+					jmp end	
+				
+success: 			movb #'S, Output
+					jmp end	
+				
+end: 	halt
+				
+.= torg + 3000
+        ; Defining variables
+		row: .byte 1
+		.even
+		col: .byte 1
+		.even
+		direction: .byte 1
+		.even
+		pointer: .word 1
+		.even
+		temp: .byte 1 
+		.even

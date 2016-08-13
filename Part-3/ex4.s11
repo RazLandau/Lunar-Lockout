@@ -1,0 +1,1125 @@
+TKS=177560
+TKB=177562
+TPS=177564
+TPB=177566
+LCS=177546
+ENTER = 13.
+BACKSPACE = 8
+WHITESPACE = 32.
+
+.=torg+20
+.word printc
+.word 200	; priority = 4
+
+.=torg+60
+.word inp
+.word 200	; priority = 4
+
+.=torg+64
+.word printc
+.word 200	; priority = 4
+
+.=torg+100
+.word clock
+.word 300	; priority = 6
+
+.=torg+1000
+main:	
+		; Setups ;;
+		mov pc, sp	; Init Stack
+		tst -(sp)	; Init Stack
+		mov #100, @#TPS ; IE enable for printer
+		
+		jsr pc, setupGame
+		
+		mov #Moves, r0
+		
+		;; Wait for game launch ;;
+		mov #-1, -(sp)	; Push dummy string for printf
+		jsr pc, scanf	; Use printf
+		tst (sp)+		; Pop prinft's parameters	
+		
+		mov #100, @#LCS	; IE enable for clock
+		
+		jsr pc, play		; Let's play!
+		
+		halt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+setupGame:		
+
+		set_rows:
+		
+				print1:	;; Print: "Please enter number of rows:" ;;
+						mov #str1, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+						jsr pc, dropLine
+		
+				scan1:	;; Scan input to buffer ;;
+						mov #nRows, -(sp)	; Push string for scanf
+						jsr pc, scanf	; Use scanf
+						tst (sp)+		; Stack restore
+		
+		set_cols:
+		
+				print2:		;; Print: "Please enter number of cols:" ;;
+						jsr pc, dropLine
+						mov #str2, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+						jsr pc, dropLine
+						
+				scan2:		;; Scan input to nCols ;;
+						mov #nCols, -(sp)	; Push string for scanf
+						jsr pc, scanf	; Use scanf
+						tst (sp)+		; Stack restore
+		
+		set_dur_and_num_moves:
+		
+				print3:		;; Print: "Please enter game duration in seconds and max number of moves:" ;;
+						jsr pc, dropLine
+						mov #str3, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+						jsr pc, dropLine
+				
+				scan3:		;; Scan input ;;
+						mov #buffer, -(sp)	; Push string for scanf
+						jsr pc, scanf	; Use scanf
+						tst (sp)+		; Stack restore
+				
+				init3:	;; Initialize duations and num_moves
+						jsr pc, initDurAndNumMoves
+
+		set_board:
+		
+				print4:		;; Print: "Please enter the board:" ;;
+						jsr pc, dropLine
+						mov #str4, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+						jsr pc, dropLine
+					
+				scan4:		;; Scan input ;;
+						mov #Board, -(sp)	; Push string for scanf
+						jsr pc, scanf	; Use scanf
+						tst (sp)+		; Stack restore
+		
+		set_ready:
+		
+				print5:		;; Print: "We are all set. Total time: " ;;
+						jsr pc, dropLine
+						jsr pc, dropLine
+						mov #str5, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+				
+				print6:		;; Print given duration ;;
+						mov #duration, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+	; Stack restore
+				
+				print7:		;; Print: " sec" ;;
+						mov #str6, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+				
+				print8:		;; Print: "Max number of allowed moves: " ;;
+						jsr pc, dropLine
+						mov #str7, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+				
+				print9:		;; Print given num_moves ;;
+						mov #num_moves, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+				
+				print10:		;; Print: " moves" ;;
+						mov #str8, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+				
+				print11:		;; Print: "Press Enter key when you are ready…" ;;
+						jsr pc, dropLine
+						mov #str9, -(sp)	; Push string for printf
+						jsr pc, printf		; Use printf
+						tst (sp)+		; Stack restore
+		
+		handle_input:	; Convert given string argument to ints
+						jsr pc, handleInput
+		
+		end_setupGame: rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+initDurAndNumMoves:
+
+				;; Enviorment conservation ;;
+				mov r1, -(sp)
+				clr r2
+				mov r2, -(sp)
+				clr r2
+				
+				mov #buffer, r1		; r1 = buffer's iterator
+				mov #duration, r2	; r2 = duration's iterator
+				init_duration:		; Initialize duration
+							cmpb (r1), #WHITESPACE	; Check if reached seperation
+							beq skip_ws		; Reached 'Whitespace'- Done initalizing duration
+							movb (r1)+, (r2)+		; Copy string input and advance iterators
+							br init_duration			; Restart loop
+							
+				skip_ws:		; Skip unknown number of 'Whitespace's
+						inc r1		; Skip 'Whitespace'
+						;cmpb (r1), #WHITESPACE		; Check if still 'Whitespace'
+						;beq skip_ws		; More 'Whitespace's to go- Restart loop
+						mov #num_moves, r2	; r2 = num_move's iterator
+						br init_num_moves		; Ready to initialize num_moves
+
+				init_num_moves:		; Initialize duration			
+							cmpb (r1), #0		; Check if reached end of string input
+							beq end_initDurAndMaxLen	; Reached end of input
+							movb (r1)+, (r2)+		; Copy string input and advance iterators
+							br init_num_moves			; Restart loop
+							
+				end_initDurAndNumMoves:
+							;; Restore and return ;;
+							mov (sp)+, r2
+							mov (sp)+, r1
+							rts pc		
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+handleInput:
+			
+			;; Enviorment conservation ;;
+			mov r1, -(sp)
+			clr r1
+			mov r2, -(sp)
+			clr r2
+			mov r3, -(sp)
+			clr r3
+			mov r4, -(sp)
+			clr r4
+			
+			hndl_nRows:	;; Convert nRows from string to int ;;
+						sub #48., nRows		
+			
+			hndl_nCols:	;; Convert nCols from string to int ;;
+						sub #48., nCols	
+
+			hndl_duration:		;; Convert string duration to int ;;
+						mov #duration, -(sp)
+						jsr pc, string2int
+						tst (sp)+
+			
+			hndl_num_moves:		;; Convert string num_moves to int ;;			
+						mov #num_moves, -(sp)
+						jsr pc, string2int
+						tst (sp)+
+
+			hndl_board:		;; Convert Board to 0's and initialize Finish ;;
+						mov #Board, r4		; r4 = Board's iterator
+						board_loop:	; Loop over given Board
+								cmpb (r4), #0	; Check if reached end of input
+								beq board_end
+								board_not_end:	; Not reached end of Board input
+											cmpb (r4), #'O		; Check if square is empty
+											beq board_empty
+											cmpb (r4), #'F		; Check if square is Finish
+											beq board_final
+											board_cont:
+													inc r4		; Advance pointer
+													br board_loop		; Continue loop
+														
+											board_empty:		; Square is empty
+													movb #'*, (r4)	; Switch 'O' (capital letter) to '0' (number zero)
+													br board_cont	; Continue loop
+													
+											board_final:
+													mov r4, Finish	; Save Finish's adress to Finish
+													br board_cont	; Continue loop
+										
+								board_end: jmp end_handleInput
+			
+			end_handleInput:
+							;; Restore and return ;;
+							mov (sp)+, r4
+							mov (sp)+, r3			
+							mov (sp)+, r2
+							mov (sp)+, r1
+							rts pc
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+play:
+
+		check_finish:		; Check if Astronaut is in Finish
+					cmpb @Finish, #'A
+					beq success
+		
+		check_num_moves:		; Check if num_moves == 0
+						tst num_moves
+						beq out_of_moves						
+		
+		print_curr_board:		; Print current Board
+					jsr pc, dropLine		
+					jsr pc, printBoard
+		
+		cont_play:		; Astronaut is not in Finish		 
+				
+				jsr pc, printMoves	; Print current moves
+		
+				scan_move:		; Scan input to Move and initialize coord
+						jsr pc, scanMove
+						tst times_up		; Check if time's up during scanMove
+						bne out_of_time
+		
+				try_move:		; Try move
+						mov #0, -(sp)		; Make room for movePiece's result
+						jsr r5, movePiece	; Use movePiece
+						coord: .blkw 2
+				
+				check_move:		; Check if move was legal
+						tst (sp)
+						bmi bad_move
+		
+		
+				execute_move:	; Move is legal - execute
+						jsr pc, executeMove	; Use executeMove
+						tst (sp)+		; Pop movePiece's parameters
+						dec num_moves	; num_moves = num_moves-1
+						br play		; More moves to go- Restart loop
+			
+		bad_move:	; Illegal move given
+				
+				tst (sp)+	; Pop movePiece's parameters
+				
+				;; Print: "Illegal move. Try again" ;;
+				jsr pc, dropLine
+				jsr pc, dropLine
+				mov #str13, -(sp)	; Push string for printf
+				jsr pc, printf	; Use printf
+				tst (sp)+		; Pop printf's parameters
+				jsr pc, dropLine
+
+				dec num_moves	; num_moves =  num_moves-1
+				tst num_moves	; Check if num_moves == 0
+				beq out_of_moves
+				br scan_move		; More moves to go- Read next move
+		
+		out_of_moves:	; num_moves == 0
+		
+				;; Print: "No more moves allowed. Game Over!" ;;
+				jsr pc, dropLine
+				jsr pc, dropLine
+				mov #str14, -(sp)	; Push string for printf
+				jsr pc, printf		; Use prinf
+				tst (sp)+			; Pop printf's parameters
+				jsr pc, dropLine
+				br end_play			; Game ended
+
+		out_of_time: 
+				;; Print: "Time's up. Game Over!" ;;
+				jsr pc, dropLine
+				mov #str17, -(sp)
+				jsr pc, printf
+				tst (sp)+
+				halt
+		
+		success: 
+				;; Replace 'A' in Finish with 'X' ;;
+				movb #'X, @Finish 
+				;; Print final Board ;;
+				jsr pc, dropLine		
+				jsr pc, printBoard
+				;; Print "Final Moves: " ;;
+				mov #str15, -(sp)	; Push string for printf
+				jsr pc, printf	; Use printf
+				tst (sp)+	; Pop printf's parameters
+				;; Print used moves ;;
+				mov #Moves, -(sp)		; Push Moves for printf
+				jsr pc, printf		; Use printf
+				tst (sp)+		; Pop printf's parameters
+				;; Print: "Well done, you won!" ;;
+				jsr pc, dropLine
+				mov #str16, -(sp)	; Push string for printf
+				jsr pc, printf		; Use printf
+				tst (sp)+		; Pop printf's parameters
+				jsr pc, dropLine
+				jmp end_play
+
+		end_play: rts pc		
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+
+printBoard:
+
+		;; Enviorment conservation ;;
+		mov r1, -(sp)
+		clr r1
+		mov r2, -(sp)
+		clr r2
+		mov r3, -(sp)
+		clr r3
+		
+		print_title: 	; Print "Current Board:"
+				jsr pc, dropLine
+				mov #str10, -(sp)
+				jsr pc, printf
+				tst (sp)+
+				jsr pc, dropLine
+		
+		print_board:	; Print content of Board
+		
+					mov #Board, r3		; r3 = Board's iterator
+					
+					loop_printBoard:	; Loop over Board: r1 = row, r2 = col
+								
+								check_nRows:		; Check if reached end of all rows = end of Board
+											cmp r1, nRows
+											beq end_printBoard	; Done printing Board
+
+								check_nCols: 		; Check if reached end of row
+											cmp r2, nCols
+											beq end_of_col
+
+								print_square:		; Print square
+											cmp r2, 0	; Check if 1st column
+											beq first_col
+											;; Print 'Whitespace' ;;
+											mov #whitespace, -(sp)	; Push string for printf
+											jsr pc, printf		; Use printf
+											tst (sp)+		; Pop printf's parameters
+											;; Print square ;;
+											first_col:
+													movb @r3, square		; Move current square's adress to square
+													mov #square, -(sp)	; Push square's adress for printf
+													jsr pc, printf		; Print square
+													tst (sp)+			; Pop printf's parameters
+													inc r2				; Advance col iterator
+													inc r3				; advance Board iterator
+													br loop_printBoard		; Restart loop
+								
+								end_of_col:		; Reached end of row
+											jsr pc, dropLine		; Drop line to new row
+											clr r2				; Clear cols counter
+											inc r1				; Increase rows counter
+											br loop_printBoard		; Restart loop					
+		end_printBoard:
+					;; Restore and return ;;
+					mov (sp)+, r3
+					mov (sp)+, r2
+					mov (sp)+, r1
+					rts pc
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+printMoves:
+				
+			pMoves1: ; Print "Moves: "
+					mov #str11, -(sp)	; Push string for printf
+					jsr pc, printf	; Use printf
+					tst (sp)+		; Pop printf's parameters
+					
+			pMoves2:		; Print used moves
+					mov #Moves, -(sp)	; Push Moves for printf
+					jsr pc, printf		; Use printf
+					tst (sp)+			; Pop printf's parameters
+			
+			jsr pc, dropLine
+			
+			pMoves3:		; Print number of moves left
+					;; Convert num_moves to string ;;
+					mov #num_moves, -(sp)
+					jsr pc, int2string
+					tst (sp)+
+					;; Print num_moves ;;
+					mov #num_moves, -(sp)
+					jsr pc, printf
+					tst (sp)+
+					;; Convert num_moves back to int ;;
+					mov #num_moves, -(sp)
+					jsr pc, string2int
+					tst (sp)+
+					
+			pMoves4:		; Print "moves left, please enter your move:"	
+					mov #str12, -(sp)	; Push string for printf
+					jsr pc, printf		; Use printf
+					tst (sp)+			; Pop printf's parameters
+			
+			jsr pc, dropLine
+
+			rts pc
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+scanMove:
+		
+		;; Enviorment conservation ;;
+		mov r1, -(sp)
+		clr r1
+		mov r2, -(sp)
+		clr r2
+		mov r3, -(sp)
+		clr r3
+		
+		scan:		; Scan input to Moves
+				tst times_up		; Check if time's up
+				bne end_scanMove	; Time's up!
+				mov #Move, -(sp)	; Push string for scanf
+				jsr pc, scanf	; Use scanf
+				tst (sp)+		; Stack restore
+				tst times_up		; Check if time's up
+				bne end_scanMove	; Time's up!
+
+		init_coord:	; Initialize movePiece's argument
+				mov #Move, r1	; r1 = Move's iterator
+				mov #coord, r2	; r2 = coord's iterator
+		
+				movb (r1), r3		; r3 = row in string representation
+				sub #48., r3		; r3 = row in int representation
+				movb r3, (r2)		; coord[0] = row in int representation
+				clr r3
+				movb 2(r1), r3		; r3 = col in string representation
+				sub #48., r3		; r3 = col in int representation
+				movb r3, 1(r2)		; coord[1] = col in int representation
+				movb 4(r1), 2(r2)	; coord[2] = direction
+		
+		end_scanMove:
+				;; Restore and return ;;
+				mov (sp)+, r3
+				mov (sp)+, r2
+				mov (sp)+, r1
+				rts pc	
+			
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+movePiece: 
+		
+		mov r1, -(sp)  
+		mov r2, -(sp)
+		mov r3, -(sp) 
+		mov r4, -(sp) 
+		
+		movb (r5)+, row
+		movb (r5)+, col
+		movb (r5)+, direction
+		inc r5
+		
+		 ; Check valid row:
+		cmpb row, #0
+		blt bad_row ; row<0
+		cmpb row, nRows
+		bge bad_row ; row>=nRows
+		jmp row_valid ; row is valid
+		bad_row: jmp out_of_bounds ; bad row
+		
+		; Row is valid
+		row_valid:
+		
+		; check valid col:
+		cmpb col, 0
+		blt bad_col ; col<0	
+		cmpb col, nCols
+		bge bad_col ; col>=nCols
+		jmp col_valid ; col is valid
+		bad_col: jmp out_of_bounds ; bad col
+		
+		; Col is valid
+		col_valid:
+		
+		; r1 points to chosen square:
+		movb row, r1
+		mul nCols, r1
+		add col, r1
+		add #Board, r1
+		
+		; Check valid square:
+		cmpb @r1, #'A
+		beq square_valid
+		cmpb @r1, #'R
+		beq square_valid
+		jmp bad_square
+		
+		; Square is valid
+		square_valid:
+		
+		; read direction
+		cmpb  direction, #'L
+		beq left_movePiece ; direction left
+		cmpb  direction, #'R
+		beq right_movePiece ; direction right
+		cmpb  direction, #'U
+		beq up_movePiece ; direction up
+		cmpb  direction, #'D
+		beq down_movePiece ; direction down
+		jmp bad_direction
+		
+left_movePiece: 	
+		; r4 points to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to end of previous row:
+		mov row, r3
+		mul nCols, r3
+		dec r3
+		add #Board, r3 
+		
+		check_left_row:		
+		; advances pointer:
+		dec r4
+	
+		; check if pointer reached end of row
+		cmp r4, r3 
+		beq left_end ; reached end of row
+		jmp next_left_check
+		left_end: jmp bad_direction
+	
+		; Check if an obstacle exists to the left
+		next_left_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_left
+		cmpb (r4), #'B ; block exists
+		beq move_left
+		cmpb (r4), #'A ; astronaut exists
+		beq move_left
+		br check_left_row ; square is empty
+		
+		; An obstacle exists
+		move_left:
+		inc r4 ; pointer points where chosen square should be
+		br new_location	
+		
+up_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to the square above the column
+		mov #Board, r3 
+		sub nCols, r3
+		add col, r3
+		
+		check_up_col:		
+		; advances pointer:
+		sub nCols, r4;
+		
+		; check if pointer reached end of col
+		cmp r4, r3 
+		beq up_end ; reached end of col
+		jmp next_up_check
+		up_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the left
+		next_up_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_up
+		cmpb (r4), #'B ; block exists
+		beq move_up
+		cmpb (r4), #'A ; astronaut exists
+		beq move_up
+		br check_up_col ; square is empty
+		
+		; An obstacle exists
+		move_up:
+		add nCols, r4 ; pointer points where chosen square should be
+		br new_location	
+		
+right_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to start of next row:
+		mov row, r3
+		inc r3
+		mul nCols, r3
+		add #Board, r3  ; r3 points to start of next row
+		
+		check_right_row:		
+		; advances pointer:
+		inc r4
+		
+		; check if pointer reached end of row
+		cmp r4, r3 
+		beq right_end ; reached end of row
+		jmp next_right_check
+		right_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the right
+		next_right_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_right
+		cmpb (r4), #'B ; block exists
+		beq move_right
+		cmpb (r4), #'A ; astronaut exists
+		beq move_right
+		br check_right_row ; square is empty
+		
+		; An obstacle exists
+		move_right:
+		dec r4 ; pointer points where chosen square should be
+		br new_location	
+
+down_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to the square below the column
+		mov nRows, r3 
+		mul nCols, r3
+		add col, r3
+		add #Board, r3
+		
+		check_down_col:		
+		; advances pointer:
+		add nCols, r4;
+		
+		; check if pointer reached end of col
+		cmp r4, r3 
+		beq down_end ; reached end of col
+		jmp next_down_check
+		down_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the left
+		next_down_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_down
+		cmpb (r4), #'B ; block exists
+		beq move_down
+		cmpb (r4), #'A ; astronaut exists
+		beq move_down
+		br check_down_col ; square is empty
+		
+		; An obstacle exists
+		move_down:
+		sub nCols, r4 ; pointer points where chosen square should be
+		br new_location				
+		
+out_of_bounds:	; return location (-1,-1)
+				mov #-1, 12(sp)
+				jmp end_move
+				
+				
+bad_direction:	; return location (-1,-1)
+				mov #-1, 12(sp)
+				jmp end_move			
+
+bad_square:	; return location (-1,-1)
+				mov #-1, 12(sp)
+				jmp end_move					
+				
+new_location:  
+				cmp r4, r1
+				beq bad_direction
+				mov r4, r3
+				sub #Board, r3
+				mov #0, r2
+				div nCols, r2
+				movb r2, 12(sp)
+				movb r3, 13(sp)
+				jmp end_move
+				
+				
+end_move: 		mov (sp)+, r4
+				mov (sp)+, r3
+				mov (sp)+, r2
+				mov (sp)+, r1
+				rts r5				
+		
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;		
+
+executeMove:
+
+		;; Enviorment conservation ;;
+		mov r1, -(sp)
+		clr r1
+		mov r2, -(sp)
+		clr r2
+		mov r3, -(sp)
+		clr r3
+		mov r4, -(sp)
+		clr r4
+		mov r5, -(sp)
+		clr r5
+			
+		exec_board: 	; Update Board
+					mov #coord, r5 	; r5 = coord
+					
+					movb (r5), r1	; r1 = Old row
+					movb 1(r5), r2	; r2 = Old col
+					movb 14(sp), r3	; r3 = New row
+					movb 15(sp), r4	; r4 = New col
+					; r1 = Old square in Board
+					mul nCols, r1
+					add r2, r1
+					add #Board, r1	; r1 = Old square in Board								
+
+					; r3 = New square in Board
+					mul nCols, r3
+					add r4, r3
+					add #Board, r3	; r3 = New square in Board
+												
+					; Execute move
+					movb (r1), (r3)
+					movb #'*, (r1)
+					
+					clr r1	; Done using r1
+					clr r2	; Done using r2
+					clr r3	; Done using r3
+					clr r4	; Done using r4
+					clr r5	; Done using r5
+
+		exec_moves:		; Update Moves array
+					mov #Move, r1		; r1 = Move's iterator
+					cmp r0, #Moves		; Check if 1st move
+					beq add_whitespace
+					add_arrow:	; Not 1st move- Add "->" between 2 moves
+								movb #'-, (r0)+
+								movb #62., (r0)+
+								jmp copy_move
+					add_whitespace:		; First mve- add whitespace
+								movb #WHITESPACE, (r0)+
+					copy_move:		; Copy Move to Moves in (X,Y,Z) format
+								movb #'(, (r0)+
+								movb (r1), (r0)+
+								movb #',, (r0)+
+								movb 2(r1), (r0)+
+								movb #',, (r0)+								
+								movb 4(r1), (r0)+
+								movb #'), (r0)+
+		
+		end_executeMove:
+					;; Restore and return ;;
+					mov (sp)+, r5
+					mov (sp)+, r4
+					mov (sp)+, r3
+					mov (sp)+, r2
+					mov (sp)+, r1
+					rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;			
+				
+ string2int:
+ 
+		;; Enviorment conservation ;;
+		 mov r1, -(sp)
+		 clr r1
+		 mov r2, -(sp)
+		 clr r2
+		 mov r3, -(sp)
+		 clr r3
+		 
+		 mov 8(sp), r3		; r3 = string's adress
+		 
+		 loop_string2int:		; r1 = string's convertion to int
+					 movb (r3), r2
+					 bic #177600, r2
+					 cmpb #0, r2
+					 beq end_loop_string2int
+					 bic #170, r2
+					 asl r1
+					 asl r1
+					 asl r1
+					 add r2, r1
+					 inc r3
+					 br loop_string2int
+			 
+		 end_loop_string2int:
+					 clr @8(sp)		; Clear string
+					 mov r1, @8(sp)		; Replace string with int
+					 ;; Restore and return ;;
+					 mov (sp)+, r3
+					 mov (sp)+, r2		 
+					 mov (sp)+, r1
+					 rts pc				
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ int2string:
+
+		;; Enviorment conservation  ;;
+		 mov r1, -(sp)
+		 clr r1
+		 mov r2, -(sp)
+		 clr r2
+		 mov r3, -(sp)
+		 clr r3
+		 
+		 mov 8(sp), r1		; r1 = int's adress
+		
+		; r2 = tens digit, r3 = ones digit
+		mov (r1), r3
+		div #10, r2
+		add #48., r2
+		add #48., r3
+		
+		; Check if int < 10
+		cmp r2, #'0
+		beq one_digit
+		
+		two_digits:
+					movb r2, (r1)
+					movb r3, 1(r1)
+					br end_int2string
+		
+		one_digit:
+					mov r3, (r1)
+		
+		end_int2string:
+					mov (sp)+, r3
+					mov (sp)+, r2
+					mov (sp)+, r1
+					
+					rts pc
+					 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+dropLine:
+		mov #drop_line, -(sp)	; Push string for printf
+		jsr pc, printf		; Use printf
+		tst (sp)+	; Stack restore
+		rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+scanf:				
+				mov 2(sp), scan_pointer	; scan_pointer = input array
+				scan_loop:	; Looping over input
+						mov #101, @#TKS		; Init RE and IE bits on TKS
+						wait	; Wait for interrupt
+						tst times_up		; Check if time's up
+						bne scanf_out_of_time	; Time's up!
+						tst done_scanning		; Check if done scanning
+						beq scan_loop			; Keep scanning
+				clr done_scanning		; Clear flag
+				clr @#TKS		; Unable RE and IE on TKS
+				rts pc		; Done scanning
+				
+				scanf_out_of_time: jmp out_of_time
+				
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+inp:		
+		enter_check:	; Check if recieved 'Enter'
+					cmpb @#TKB, #ENTER	
+					beq inp_enter	
+		
+		bs_check:	; Check if 'Backspace'
+				cmpb @#TKB, #BACKSPACE	
+				beq inp_bs
+
+		inp_valid:	; Not 'Enter' or 'Backspace'
+				movb @#TKB, @scan_pointer		; Write note to input array
+				inc scan_pointer		; Advance pointer in input array
+				loop_inp:	; Busy waiting for printer to be ready
+						tstb TPS	; Check print
+						bpl loop_inp	; Printer not ready- Keep waiting
+				movb @#TKB, @#TPB	; Echo to printer
+				br end_inp
+				
+		inp_enter:	; Recieved 'Enter'
+				mov #1, done_scanning		; Mark flag
+				br end_inp		; Done scanning
+				
+		inp_bs:		; Recieved 'Backspace'
+				cmp scan_pointer, 6(sp)	; Check if marker is in start of line
+				beq end_inp		; Marker is in start of line- Do nothing
+				
+				;; Withdraw marker ;;
+				; 1. Withdraw marker
+				loop2_inp:	; Busy waiting for printer to be ready
+						tstb TPS	; Check print
+						bpl loop2_inp	; Printer not ready- Keep waiting
+				movb #BACKSPACE, @#TPB	; Echo 'Backspace'
+				; 2. Clear last note
+				loop3_inp:	; Busy waiting for printer to be ready
+						tstb TPS	; Check print
+						bpl loop3_inp	; Printer not ready- Keep waiting
+				movb #WHITESPACE, @#TPB	; Echo 'Whitespace'
+				; 3. Withdraw marker
+				loop4_inp:	; Busy waiting for printer to be ready
+						tstb TPS	; Check print
+						bpl loop4_inp	; Printer not ready- Keep waiting
+				movb #BACKSPACE, @#TPB	; Echo 'Backspace'
+				
+				;; Restore input array ;;
+				dec scan_pointer	; Withdraw pointer
+				movb #0, @scan_pointer		; Clear content in input array
+				
+				br end_inp
+				
+
+		
+		end_inp: rti		; Done handling keyboard iterrupt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+		
+printf:		
+			mov #1, print_busy	; Mark busy printer
+			mov 2(sp), print_pointer	; print_pointer = output array
+			cmpb @print_pointer, #0
+			beq printf_end
+			iot		; Use iot to initiate 1st iterrupt
+			print_loop:	; Wait for printer iterrupt
+					wait
+					tst print_busy	; Check if printer is busy
+					bgt print_loop	; Printer is busy- Keep waiting
+			printf_end: rts pc	; Done printing
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;				
+		
+printc:		
+			cmpb @print_pointer, #0		; Check if reached end of output array (marked by 0)
+			beq sof_printc		; Reached end of output array
+			movb @print_pointer, @#TPB		; Print note
+			inc print_pointer	; Advance pointer in output array
+			rti		; Done handling printer interrupt
+			sof_printc: 
+					clr print_busy	; Reached end of output array- Free printer
+					rti		; Done handling printer interrupt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+clock:
+		inc counter	; counter = counter+1
+		cmp counter, rate		; Check if a second passed
+		bne clock_end			; More ticks to go
+		second_passed:
+					clr counter		; Restore counter
+					dec duration		; duration = duration-1
+					tst duration		; Check if time given passed
+					bne clock_end		; More seconds to go
+					
+		time_is_up:		; duration == 0
+					clr @#LCS			; Disable clock's IE
+					mov #1, times_up		; Mark time's up
+		
+		clock_end: rti		
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+
+.=torg+5000
+
+;; Global ;;
+duration: .blkw 2
+.byte 0
+.even
+num_moves: .blkw 1
+.byte 0
+.even
+nRows: .byte 0
+.even
+nCols: .byte 0
+.even
+Board: .blkw 50
+Finish: .blkw 1
+Moves: .blkw 100
+times_up: .byte 0
+.even
+temp: .blkw 1
+buffer: .blkw 50
+.even 
+
+;; printf and printc ;;
+print_pointer: .blkw 1
+print_busy: .word 0
+
+;; scanf and inp ;;
+scan_pointer: .blkw 1
+done_scanning: .word 0
+
+;; printBoard ;;
+square: .blkw 1
+
+;; clock ;;
+counter: .blkw 1
+.even
+;rate: .word 1000
+
+;; movePiece ;;
+row:       .byte 1
+.even
+col:       .byte 1
+.even
+direction: .byte 1
+.even
+
+;; scanMove ;;
+Move: .blkw 3
+
+;; Strings for printf ;;
+whitespace: .byte ' , 0
+drop_line:
+.byte 10., 13., 0
+.even
+str1:
+.ascii <Please enter number of rows:>
+.byte 0
+.even
+str2:
+.ascii <Please enter number of columns:>
+.byte 0
+.even
+str3:
+.ascii <Please enter game duration in seconds and max number of moves:>
+.byte 0
+.even
+str4:
+.ascii <Please enter the board:>
+.byte 0
+.even
+str5:
+.ascii <We are all set. Total time: >
+.byte 0
+.even
+str6:
+.ascii < sec>
+.byte 0
+.even
+str7:
+.ascii <Max number of allowed moves: >
+.byte 0
+.even
+str8:
+.ascii < moves>
+.byte 0
+.even
+str9:
+.ascii <Press Enter key when you are ready...>
+.byte 0
+.even
+str10:
+.ascii <Current Board:>
+.byte 0
+.even
+str11:
+.ascii <Moves:>
+.byte 0
+.even
+str12:
+.ascii < moves left, please enter your move:>
+.byte 0
+.even
+str13:
+.ascii <Illegal move. Try again>
+.byte 0
+.even
+str14:
+.ascii <No more moves allowed. Game Over!>
+.byte 0
+.even
+str15:
+.ascii <Final Moves:>
+.byte 0
+.even
+str16:
+.ascii <Well done, you won!>
+.byte 0
+.even
+str17:
+.ascii <Time's up. Game Over!>
+.byte 0
+.even

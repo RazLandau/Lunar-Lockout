@@ -1,0 +1,1133 @@
+. = torg + 3000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+main:
+
+;; Use findShortest ;;
+mov #Moves, -(sp)	; Push Moves for findShortest
+jsr pc, findShortest
+tst (sp)+	; Pop findShortest's parameters
+halt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+findShortest:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+	
+	; Initialize Movables
+	mov #Movables, -(sp) ; r0 points to empty Movables
+	jsr pc, getMovables ; Movables intialized to r0
+	tst (sp)+	; Pop getMovables's parameters
+	
+	; Initialize number of Movables
+	mov r4, num_movables
+	
+	; r0 = Iterator over increasing MaxLens
+	mov #1, r0
+	
+	; Use findSol with increasing MaxLens up to given MaxLen
+	fShort_loop:
+
+		cmpb r0, MaxLen	; Check if iterator reached given MaxLen
+		bgt fShort_end	; Iterator exceeds given MaxLen- end loop
+	
+		; Use findSol with MaxLen = r0
+		use_fSol:
+		
+			mov #0, -(sp)	; Make room for findSol's result
+			mov 18(sp), -(sp) ; Push Moves for findSol
+			mov r0, -(sp)	; Push MaxLen for findSol
+			mov #Movables, -(sp)	; Push Movables for findSol
+			jsr pc, findSol
+		
+		; Check findSol's result
+		check_fSol:
+			
+			cmp (sp)+, (sp)+	; Pop findSol's parameters
+			tst (sp)+	; Pop findSol's parameters
+			tst (sp)+	; Check findSol's result
+			bne fShort_end	; Result == true
+			; Result == false
+			inc r0	; Advance iterator
+			jmp fShort_loop	; Repeate
+	
+	; End of subroutine- Return
+	fShort_end:
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+unmarkLocation:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+
+	mov 16(sp), r0 	; r0 = Movable
+	movb (r0)+, r1	; r1 = Movable's row
+	movb (r0), r2	; r2 = Movable's col
+	dec r0	; restore r0	
+	
+	; r1 = Current square in locations_board			
+	mul nCols, r1
+	add r2, r1
+	mul #2, r1
+	add #locations_board, r1
+	
+	; Unmark location
+	mov #0, -(sp)	; Make room for getMask's result
+	mov r0, -(sp)	; Push movable for getMask
+	jsr pc, getMask
+	tst (sp)+	; Pop getMask's parameter
+	mov (sp)+, r5	; r5 = Movable's mask
+	bic r5, (r1)	
+	
+	; End of subroutine- Return
+	unmark_end: 
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+restoreMove:
+ 
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+	
+	
+	mov 18(sp), r0 	; r0 = Movable
+	movb 16(sp), r1	; r1 = Old row
+	movb 17(sp), r2	; r2 = Old col
+	movb (r0)+, r3	; r3 = New row
+	movb (r0), r4	; r4 = New col
+	dec r0	; restore r0
+	
+	
+	; Restore Board
+	res_board:
+	
+		mul nCols, r1
+		add r2, r1
+		add #Board, r1	; r1 = Old square in Board
+		mul nCols, r3
+		add r4, r3
+		add #Board, r3	; r3 = New square in Board							
+		movb (r3), r5	; swap
+		movb (r1), (r3)	; swap
+		movb r5, (r1)	; swap
+	
+	clr r2	; Done using r2
+	clr r3	; Done using r3
+	clr r4	; Done using r4
+	clr r5	; Done using r5
+	
+	
+	; Restore Movables
+	res_movables:
+	
+		mov 16(sp), (r0)
+
+		
+	clr r0 ; Done using r0
+
+	
+	; Restore Moves
+	res_moves:
+	
+		mov 22(sp), r0
+		movb #'@, (r0)+
+		movb #0, (r0)+
+		movb #0, (r0)+
+		movb #0, (r0)+
+	
+	
+	; End of subroutine- Return
+	resMove_end: 
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+executeMove:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+	
+	mov 18(sp), r0 	; r0 = Movable
+	movb (r0)+, r1	; r1 = Old row
+	movb (r0), r2	; r2 = Old col
+	dec r0	; restore r0
+	movb 26(sp), r3	; r3 = New row
+	movb 27(sp), r4	; r4 = New col
+
+	; Update Movables
+	ex_movables:
+		mov 26(sp), (r0)
+			
+	; Update Moves
+	ex_moves:
+	
+		mov 24(sp), r5	; r5 = Moves
+		movb r1, (r5)+	; Write row
+		movb r2, (r5)+	; Write col
+		movb 22(sp), (r5)+	; Write direction
+		movb #'@, (r5)	; Write "@"
+		clr r5	; Done using r5
+	
+	; Update Board
+	ex_board:
+		
+		; r1 = Old square in Board
+		mul nCols, r1
+		add r2, r1
+		add #Board, r1	; r1 = Old square in Board								
+		clr r2	; Done using r2
+
+		; r3 = New square in Board
+		mul nCols, r3
+		add r4, r3
+		add #Board, r3	; r3 = New square in Board
+		clr r4	; Done using r4
+									
+		; Execute move
+		movb (r1), r2
+		movb (r3), (r1)
+		movb r2, (r3)
+	
+	; End of subroutine- Return
+	exMove_end: 
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+getMask:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+
+	; r0 = Given Movable
+	mov 16(sp), r0
+
+	; r2 = 1 in Movable's bit, 0 otherwise
+	mov #1, r2	; r2 = 1
+	gMask_loop:	; iterate (num of Movable) times
+		cmp r0, #Movables	; Counts iterations
+		beq gMask_end	; Iterated desired amout of times
+		asl r2	; Multiply r2 by 2
+		sub #2, r0	; Advance iterator
+		br gMask_loop	
+		
+	; End of subroutine- Return result	
+	gMask_end: 
+		
+		mov r2, 18(sp) ; Return result
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+checkLocation:
+	
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+	
+	; r2 = Movable's mask
+	mov 16(sp), r0	; r0 = Current Movable
+	mov #0, -(sp)	; Setup for getMask
+	mov r0, -(sp)	; Push current Movable for getMask
+	jsr pc, getMask
+	tst (sp)+	; Pop r0
+	mov (sp)+, r2	; r2 = Movable's mask
+	
+	; Restore r0
+	clr r0
+		
+	; r1 = Next location in locations_board
+	movb 18(sp), r0 ; r0 = Next row
+	movb 19(sp), r4 ; r4 = Next col
+	mov r0, r1
+	mul nCols, r1
+	add r4, r1	; r1 = Movable's location index in Board
+	mul #2, r1	; r1 = Movable's location index in locations_board
+	add #locations_board, r1 ; r1 = Movable's locatiom in locations_board
+	
+	; Restore r0 and r4
+	clr r0
+	clr r4
+	
+	; Check Movable's bit in locations_board
+	mov (r1), r4
+	mov #177777, r3	; r3 = -1
+	bic r2, r3
+	bic r3, r4
+	tst r4
+	bne bad_location
+	mov #0, 22(sp)
+	br check_end
+	
+	; Bad location
+	bad_location: mov #-1, 22(sp)
+	
+	; End of subroutine- Return result	
+	check_end:
+	
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+markLocation:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+	
+	; r0 = Current Movable
+	mov 16(sp), r0
+	
+	; r1 = Movable's current location in locations_board
+	movb (r0)+, r1
+	mul nCols, r1
+	movb (r0), r3
+	add r3, r1
+	mul #2, r1
+	add #locations_board, r1
+	dec r0	; restore r0
+	clr r3	; restore r3
+	
+	; r2 = Movable's mask
+	mov #0, -(sp)	; Setup for getMask
+	mov r0, -(sp)	; Push current Movable
+	jsr pc, getMask
+	tst (sp)+	; Pop r0
+	mov (sp)+, r2	; r2 = Movable's mask
+
+	; Write location to temp_board
+	bis r2, (r1)	; Use r5 to lit Movable's bit in current square in temp_board
+	
+	; End of subroutine- Return
+	markLoc_end:
+	
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+findSol:
+
+	; Enviroment conservation
+	mov r0, -(sp)
+	clr r0
+	mov r1, -(sp)
+	clr r1
+	mov r2, -(sp)
+	clr r2
+	mov r3, -(sp)
+	clr r3
+	mov r4, -(sp)
+	clr r4
+	mov r5, -(sp)
+	clr r5
+
+	check_finish:
+		
+		mov #Movables, r0 ; r0 points to Astronaut
+		mov #Finish, r1 ;r1 points to Finish
+		cmp (r0), (r1)
+		bne not_finish ; Astronaut not in Finish
+		jmp fSol_success ; Astronaut not in Finish
+	
+	not_finish:
+	
+		clr r0 ; Restore r0
+		clr r1 ; Restore r1
+		
+		check_moves:
+			tst 18(sp) ; Check n==0
+			bne more_moves ; n!=0
+			jmp fSol_fail	; n==0
+			
+			more_moves:
+				
+				mov #0, r0 ; r0 = Index of current Movable
+				
+				fSol_loop:
+					
+					; r1 = Current Movable
+					mov r0, r1
+					mul #2, r1
+					add #Movables, r1
+					
+					; Add Movabel's location to locations_board
+					mark_location:
+					
+						mov r1, -(sp)	; Push Movable for markLocation
+						jsr pc, markLocation
+						tst (sp)+	; Pop markLocation's parameters
+					
+					; Move right
+					R:
+						
+						R_try:
+						
+							mov (r1), R_coord
+							mov #0, -(sp)		; Setup for movePiece
+							jsr r5, movePiece
+							R_coord: .byte 0,0, 'R
+							.even
+							mov (sp)+, r2	; r2 = movePiece's result
+						
+						R_check:
+							
+							R_legal_check:
+							
+								tst r2	; Check movePiece's result
+								bmi L
+							
+							R_location_check:
+								
+
+								mov #0, -(sp)	; Setup for CheckLocation's result
+								mov r2, -(sp)	; Push movePiece's result
+								mov r1, -(sp)	; Push Movable for checkLocation
+								jsr pc, checkLocation
+								cmp (sp)+, (sp)+	; Pop checkLocation's parameters
+								tst (sp)+	; Check checkLocation's result
+								bmi L
+								
+						R_good:
+												
+							R_move:
+									
+								; Execute move
+								R_execute:
+									
+									mov r2, -(sp)	; Make room for movePiece's result
+									clr r2	; Done using r2
+									mov 24(sp), -(sp)	; Push Moves for executeMove
+									mov #'R, -(sp)	; Push direction for executeMove
+									mov r1, -(sp)	; Push Movable for executeMove
+									mov (r1), -(sp)	; Push Movable's pre-location
+									jsr pc, executeMove
+									mov (sp)+, r2	; r2 = Movable's pre-location
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+								
+									
+								; findSol with same Movable and MaxLen-1
+								R_next:
+									
+									mov #0, -(sp)	; Make room for findSol's result
+									mov 24(sp), -(sp)	; Push Moves for findSol
+									add #3, (sp)	; Advance Moves for findSol
+									mov 24(sp), -(sp)	; Push MaxLen for findSol
+									dec (sp)	; Decrease MaxLen for findSol
+									mov 24(sp), -(sp)	; Push Movable for findSol
+									jsr pc, findSol
+									cmp (sp)+, (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Check findSol's result
+									beq R_restore	; Recursion failed- Try next direction on same Movable
+									jmp fSol_success	; Recursion succeeded- Return true
+							
+						R_restore:
+						
+							mov 22(sp), -(sp)	; Push Moves for restoreMove
+							mov r1, -(sp)	; Push Movable for restoreMove
+							mov r2, -(sp)	; Push pre-location for restoreMove
+							clr r2	; Done using r2
+							jsr pc, restoreMove
+							cmp (sp)+, (sp)+	; Pop restoreMove's parameters
+							tst (sp)+	; Pop restoreMove's parameters
+	
+					
+					; Move Left
+					L:
+						
+						L_try:
+						
+							mov (r1), L_coord
+							mov #0, -(sp)		; Make room for movePiece's result
+							jsr r5, movePiece
+							L_coord: .byte 0,0, 'L
+							.even
+							mov (sp)+, r2	; r2 = movePiece's result
+						
+						L_check:
+							
+							L_legal_check:
+							
+								tst r2	; Check movePiece's result
+								bmi U
+							
+							L_location_check:
+								
+
+								mov #0, -(sp)	; Make room for CheckLocation's result
+								mov r2, -(sp)	; Push movePiece's result
+								mov r1, -(sp)	; Push Movable for checkLocation
+								jsr pc, checkLocation
+								cmp (sp)+, (sp)+	; Pop checkLocation's parameters
+								tst (sp)+	; Check checkLocation's result
+								bmi U
+								
+						L_good:
+												
+							L_move:
+									
+								; Execute move
+								L_execute:
+									
+									mov r2, -(sp)	; Push movePiece's result
+									clr r2	; Done using r2
+									mov 24(sp), -(sp)	; Push Moves for executeMove
+									mov #'L, -(sp)	; Push direction for executeMove
+									mov r1, -(sp)	; Push Movable for executeMove
+									mov (r1), -(sp)	; Push Movable's pre-location
+									jsr pc, executeMove
+									mov (sp)+, r2	; r2 = Movable's pre-location
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+								
+									
+								; findSol with same Movable and MaxLen-1
+								L_next:
+									
+									mov #0, -(sp)	; Make room for findSol's result
+									mov 24(sp), -(sp)	; Push Moves for findSol
+									add #3, (sp)	; Advance Moves for findSol
+									mov 24(sp), -(sp)	; Push MaxLen for findSol
+									dec (sp)	; Decrease MaxLen for findSol
+									mov 24(sp), -(sp)	; Push Movable for findSol
+									jsr pc, findSol
+									cmp (sp)+, (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Check findSol's result
+									beq L_restore	; Recursion failed- Try next direction on same Movable
+									jmp fSol_success	; Recursion succeeded- Return true
+							
+						L_restore:
+						
+							mov 22(sp), -(sp)	; Push Moves for restoreMove
+							mov r1, -(sp)	; Push Movable for restoreMove
+							mov r2, -(sp)	; Push pre-location for restoreMove
+							clr r2	; Done using r2
+							jsr pc, restoreMove
+							cmp (sp)+, (sp)+	; Pop restoreMove's parameters
+							tst (sp)+	; Pop restoreMove's parameters
+	
+					
+					; Move Up
+					U:
+						
+						U_try:
+						
+							mov (r1), U_coord
+							mov #0, -(sp)		; Make room for movePiece's result
+							jsr r5, movePiece
+							U_coord: .byte 0,0, 'U
+							.even
+							mov (sp)+, r2	; r2 = movePiece's result
+						
+						U_check:
+							
+							U_legal_check:
+							
+								tst r2	; Check movePiece's result
+								bmi D
+							
+							U_location_check:
+								
+
+								mov #0, -(sp)	; Make room for CheckLocation's result
+								mov r2, -(sp)	; Push movePiece's result
+								mov r1, -(sp)	; Push Movable for checkLocation
+								jsr pc, checkLocation
+								cmp (sp)+, (sp)+	; Pop checkLocation's parameters
+								tst (sp)+	; Check checkLocation's result
+								bmi D
+								
+						U_good:
+												
+							U_move:
+									
+								; Execute move
+								U_execute:
+									
+									mov r2, -(sp)	; Push movePiece's result
+									clr r2	; Done using r2
+									mov 24(sp), -(sp)	; Push Moves for executeMove
+									mov #'U, -(sp)	; Push direction for executeMove
+									mov r1, -(sp)	; Push Movable for executeMove
+									mov (r1), -(sp)	; Push Movable's pre-location
+									jsr pc, executeMove
+									mov (sp)+, r2	; r2 = Movable's pre-location
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+								
+									
+								; findSol with same Movable and MaxLen-1
+								U_next:
+									
+									mov #0, -(sp)	; Make room for findSol's result
+									mov 24(sp), -(sp)	; Push Moves for findSol
+									add #3, (sp)	; Advance Moves for findSol
+									mov 24(sp), -(sp)	; Push MaxLen for findSol
+									dec (sp)	; Decrease MaxLen for findSol
+									mov 24(sp), -(sp)	; Push Movable for findSol
+									jsr pc, findSol
+									cmp (sp)+, (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Check findSol's result
+									beq U_restore	; Recursion failed- Try next direction on same Movable
+									jmp fSol_success	; Recursion succeeded- Return true
+							
+						U_restore:
+						
+							mov 22(sp), -(sp)	; Push Moves for restoreMove
+							mov r1, -(sp)	; Push Movable for restoreMove
+							mov r2, -(sp)	; Push pre-location for restoreMove
+							clr r2	; Done using r2
+							jsr pc, restoreMove
+							cmp (sp)+, (sp)+	; Pop restoreMove's parameters
+							tst (sp)+	; Pop restoreMove's parameters
+	
+					
+					; Move Down
+					D:
+						
+						D_try:
+						
+							mov (r1), D_coord
+							mov #0, -(sp)		; Make room for movePiece's result
+							jsr r5, movePiece
+							D_coord: .byte 0,0, 'D
+							.even
+							mov (sp)+, r2	; r2 = movePiece's result
+						
+						D_check:
+							
+							D_legal_check:
+							
+								tst r2	; Check movePiece's result
+								bmi no_dir
+							
+							D_location_check:
+								
+
+								mov #0, -(sp)	; Make room for CheckLocation's result
+								mov r2, -(sp)	; Push movePiece's result
+								mov r1, -(sp)	; Push Movable for checkLocation
+								jsr pc, checkLocation
+								cmp (sp)+, (sp)+	; Pop checkLocation's parameters
+								tst (sp)+	; Check checkLocation's result
+								bmi no_dir
+								
+						D_good:
+												
+							D_move:
+									
+								; Execute move
+								D_execute:
+									
+									mov r2, -(sp)	; Make room for movePiece's result
+									clr r2	; Done using r2
+									mov 24(sp), -(sp)	; Push Moves for executeMove
+									mov #'D, -(sp)	; Push direction for executeMove
+									mov r1, -(sp)	; Push Movable for executeMove
+									mov (r1), -(sp)	; Push Movable's pre-location
+									jsr pc, executeMove
+									mov (sp)+, r2	; r2 = Movable's pre-location
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+									cmp (sp)+, (sp)+	; Pop executeMove's parameters
+								
+									
+								; findSol with same Movable and MaxLen-1
+								D_next:
+									
+									mov #0, -(sp)	; Make room for findSol's result
+									mov 24(sp), -(sp)	; Push Moves for findSol
+									add #3, (sp)	; Advance Moves for findSol
+									mov 24(sp), -(sp)	; Push MaxLen for findSol
+									dec (sp)	; Decrease MaxLen for findSol
+									mov 24(sp), -(sp)	; Push Movable for findSol
+									jsr pc, findSol
+									cmp (sp)+, (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Pop findSol's parameters
+									tst (sp)+	; Check findSol's result
+									beq D_restore	; Recursion failed- Try next direction on same Movable
+									jmp fSol_success	; Recursion succeeded- Return true
+							
+						D_restore:
+						
+							mov 22(sp), -(sp)	; Push Moves for restoreMove
+							mov r1, -(sp)	; Push Movable for restoreMove
+							mov r2, -(sp)	; Push pre-location for restoreMove
+							clr r2	; Done using r2
+							jsr pc, restoreMove
+							cmp (sp)+, (sp)+	; Pop restoreMove's parameters
+							tst (sp)+	; Pop restoreMove's parameters
+	
+					
+					
+					no_dir:
+							
+							; Unmark location
+							mov r1, -(sp)	; Push Movable for unmarkLocation
+							jsr pc, unmarkLocation
+							tst (sp)+	; Pop unmarkLocation's parameters
+							inc r0
+							cmp r0, num_movables
+							bge fSol_fail
+							jmp fSol_loop
+	
+	
+	; MaxLen == 0 - Return false
+	fSol_fail:
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		mov #0, 10(sp)
+		rts pc
+	
+	; Astronaut in Finish - Return true
+	fSol_success: 
+		
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		mov #1, 10(sp)
+		rts pc
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+movePiece: 
+		mov r1, -(sp)  
+		mov r2, -(sp)
+		mov r3, -(sp) 
+		mov r4, -(sp) 
+		movb (r5)+, row
+		movb (r5)+, col
+		movb (r5)+, direction
+		inc r5
+		
+		 ; check valid row:
+		cmpb row, #0
+		blt bad_row ; row<0
+		cmpb row, nRows
+		bge bad_row ; row>=nRows
+		jmp row_valid ; row is valid
+		bad_row: jmp out_of_bounds ; bad row
+		
+		; Row is valid
+		row_valid:
+		
+		; check valid col:
+		cmpb col, 0
+		blt bad_col ; col<0	
+		cmpb col, nCols
+		bge bad_col ; col>=nCols
+		jmp col_valid ; col is valid
+		bad_col: jmp out_of_bounds ; bad col
+		
+		; Col is valid
+		col_valid:
+		
+		; r1 points to chosen square:
+		movb row, r1
+		mul nCols, r1
+		add col, r1
+		add #Board, r1
+		
+		; read direction
+		cmpb  direction, #'L
+		beq left_movePiece ; direction left
+		cmpb  direction, #'R
+		beq right_movePiece ; direction right
+		cmpb  direction, #'U
+		beq up_movePiece ; direction up
+		cmpb  direction, #'D
+		beq down_movePiece ; direction down
+		jmp bad_direction
+		
+left_movePiece: 	
+		; r4 points to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to end of previous row:
+		mov row, r3
+		mul nCols, r3
+		dec r3
+		add #Board, r3 
+		
+		check_left_row:		
+		; advances pointer:
+		dec r4
+	
+		; check if pointer reached end of row
+		cmp r4, r3 
+		beq left_end ; reached end of row
+		jmp next_left_check
+		left_end: jmp bad_direction
+	
+		; Check if an obstacle exists to the left
+		next_left_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_left
+		cmpb (r4), #'B ; block exists
+		beq move_left
+		cmpb (r4), #'A ; astronaut exists
+		beq move_left
+		br check_left_row ; square is empty
+		
+		; An obstacle exists
+		move_left:
+		inc r4 ; pointer points where chosen square should be
+		br new_location	
+		
+up_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to the square above the column
+		mov #Board, r3 
+		sub nCols, r3
+		add col, r3
+		
+		check_up_col:		
+		; advances pointer:
+		sub nCols, r4;
+		
+		; check if pointer reached end of col
+		cmp r4, r3 
+		beq up_end ; reached end of col
+		jmp next_up_check
+		up_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the left
+		next_up_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_up
+		cmpb (r4), #'B ; block exists
+		beq move_up
+		cmpb (r4), #'A ; astronaut exists
+		beq move_up
+		br check_up_col ; square is empty
+		
+		; An obstacle exists
+		move_up:
+		add nCols, r4 ; pointer points where chosen square should be
+		br new_location	
+		
+right_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to start of next row:
+		mov row, r3
+		inc r3
+		mul nCols, r3
+		add #Board, r3  ; r3 points to start of next row
+		
+		check_right_row:		
+		; advances pointer:
+		inc r4
+		
+		; check if pointer reached end of row
+		cmp r4, r3 
+		beq right_end ; reached end of row
+		jmp next_right_check
+		right_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the right
+		next_right_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_right
+		cmpb (r4), #'B ; block exists
+		beq move_right
+		cmpb (r4), #'A ; astronaut exists
+		beq move_right
+		br check_right_row ; square is empty
+		
+		; An obstacle exists
+		move_right:
+		dec r4 ; pointer points where chosen square should be
+		br new_location	
+
+down_movePiece: 	
+		; pointer point to adress of chosen_square:
+		mov r1, r4
+		
+		; r3 points to the square below the column
+		mov nRows, r3 
+		mul nCols, r3
+		add col, r3
+		add #Board, r3
+		
+		check_down_col:		
+		; advances pointer:
+		add nCols, r4;
+		
+		; check if pointer reached end of col
+		cmp r4, r3 
+		beq down_end ; reached end of col
+		jmp next_down_check
+		down_end: jmp bad_direction
+		
+		; Check if an obstacle exists to the left
+		next_down_check:
+		cmpb (r4), #'R ; robot exists
+		beq move_down
+		cmpb (r4), #'B ; block exists
+		beq move_down
+		cmpb (r4), #'A ; astronaut exists
+		beq move_down
+		br check_down_col ; square is empty
+		
+		; An obstacle exists
+		move_down:
+		sub nCols, r4 ; pointer points where chosen square should be
+		br new_location				
+		
+out_of_bounds:	; return location (-1,-1)
+				mov #-1, 12(sp)
+				jmp end_move
+				
+				
+bad_direction:	; return location (-1,-1)
+				mov #-1, 12(sp)
+				jmp end_move			
+
+new_location:  
+				mov r4, r3
+				sub #Board, r3
+				mov #0, r2
+				div nCols, r2
+				movb r2, 12(sp)
+				movb r3, 13(sp)
+				jmp end_move
+				
+				
+end_move: 		mov (sp)+, r4
+				mov (sp)+, r3
+				mov (sp)+, r2
+				mov (sp)+, r1
+				rts r5
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+getMovable:
+
+; Enviroment conservation
+mov r0, -(sp)
+mov r1, -(sp)
+mov r2, -(sp)
+mov r3, -(sp)
+mov r5, -(sp)
+
+; r0 points to start of Board
+mov #Board, r0
+
+; r1 points to end of Board
+mov nCols, r1
+mul nRows, r1
+add #Board, r1
+
+; r4 points to start of movables
+mov 14(sp), r4
+
+; r5 points to start of robotic movables
+mov r4, r5
+add #2, r5
+
+main_loop:
+
+cmp r0, r1
+beq end_getMovables
+
+cmpb (r0), #'B
+beq next
+cmpb (r0), #0
+beq next
+
+; Robot/astronaut was found:
+inc counter ; increase counter
+
+; r2=row, r3=col
+mov r0, r3
+sub #Board, r3
+mov #0, r2
+div nCols, r2
+
+cmpb (r0), #'A ; astronaut was found
+beq astronaut
+cmpb (r0), #'R ; robot was found
+beq robot
+
+astronaut:
+movb r2, (r4)+
+movb r3, (r4)
+jmp next
+
+robot:
+movb r2, (r5)+
+movb r3, (r5)+
+jmp next
+
+; Board's square read successfuly
+next:
+inc r0
+jmp main_loop
+
+; reach end of Board
+end_getMovables:
+mov (sp)+, r5
+mov (sp)+, r3
+mov (sp)+, r2
+mov (sp)+, r1
+mov (sp)+, r0
+mov counter, r4
+rts pc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.=torg + 7000
+
+Movables: .blkw 8
+counter: .byte 0
+.even
+row:       .byte 1
+.even
+col:       .byte 1
+.even
+direction: .byte 1
+.even
+num_movables: .byte 1
+.even
+locations_board: .blkw 128
